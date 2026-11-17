@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vehicle Details · MotoSheba</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/js/api.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
+  <div id="motosheba-navbar"></div>
+
+  <main x-data="listingDetailPage()" x-init="init()" class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="mb-4">
+      <a href="/listings.html" class="text-xs font-semibold text-slate-600 hover:text-slate-900">← Back to Marketplace Listings</a>
+    </div>
+
+    <template x-if="loading">
+      <div class="bg-white rounded-2xl border border-slate-200 p-12 text-center text-sm text-slate-500">Loading vehicle details...</div>
+    </template>
+
+    <template x-if="!loading && !car">
+      <div class="bg-white rounded-2xl border border-slate-200 p-12 text-center">
+        <h2 class="text-lg font-bold mb-2">Vehicle Not Found</h2>
+        <a href="/listings.html" class="text-xs font-semibold text-emerald-600 underline">Browse all vehicles</a>
+      </div>
+    </template>
+
+    <template x-if="!loading && car">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <!-- Left Column: Photos & Specs -->
+        <div class="lg:col-span-8 space-y-6">
+          <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div class="relative h-80 sm:h-96 bg-slate-900">
+              <img :src="activeImage || (car.images && car.images[0]) || 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=900&q=80'" :alt="car.title" class="w-full h-full object-cover" />
+              <div class="absolute top-4 left-4 flex items-center gap-2">
+                <span class="px-3 py-1 rounded-full text-xs font-bold uppercase bg-slate-900/90 text-white" x-text="car.condition"></span>
+                <span class="px-3 py-1 rounded-full text-xs font-bold uppercase"
+                  :class="car.status === 'active' ? 'bg-emerald-500 text-slate-950' : 'bg-amber-500 text-slate-950'"
+                  x-text="car.status"></span>
+              </div>
+            </div>
+            <template x-if="car.images && car.images.length > 1">
+              <div class="p-3 bg-slate-50 border-t border-slate-200 flex gap-2 overflow-x-auto">
+                <template x-for="(img, idx) in car.images" :key="idx">
+                  <button @click="activeImage = img" class="w-20 h-14 rounded-lg overflow-hidden border-2 transition" :class="activeImage === img ? 'border-emerald-500' : 'border-transparent'">
+                    <img :src="img" class="w-full h-full object-cover" />
+                  </button>
+                </template>
+              </div>
+            </template>
+
+            <div class="p-6">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <div>
+                  <h1 class="text-2xl font-bold text-slate-900" x-text="car.title"></h1>
+                  <p class="text-xs text-slate-500 mt-0.5" x-text="`Listed ${MotoApi.formatDate(car.createdAt)} · Location: ${car.location}`"></p>
+                </div>
+                <div class="text-2xl font-extrabold text-emerald-600" x-text="MotoApi.formatBDT(car.price)"></div>
+              </div>
+
+              <!-- Key Specs Grid -->
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 py-4 border-y border-slate-100 text-xs">
+                <div class="p-3 rounded-xl bg-slate-50">
+                  <div class="text-slate-400">Make & Model</div>
+                  <div class="font-bold text-slate-900 mt-0.5" x-text="`${car.make} ${car.model}`"></div>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-50">
+                  <div class="text-slate-400">Model Year / Reg</div>
+                  <div class="font-bold text-slate-900 mt-0.5" x-text="`${car.year} (${car.registrationYear || 'Unreg'})`"></div>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-50">
+                  <div class="text-slate-400">Mileage</div>
+                  <div class="font-bold text-slate-900 mt-0.5" x-text="`${(car.mileage || 0).toLocaleString()} km`"></div>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-50">
+                  <div class="text-slate-400">Engine & Fuel</div>
+                  <div class="font-bold text-slate-900 mt-0.5" x-text="`${car.engineCc || 1500}cc · ${car.fuelType}`"></div>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-50">
+                  <div class="text-slate-400">Transmission</div>
+                  <div class="font-bold text-slate-900 mt-0.5" x-text="car.transmission"></div>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-50">
+                  <div class="text-slate-400">Body Type</div>
+                  <div class="font-bold text-slate-900 mt-0.5" x-text="car.bodyType"></div>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-50">
+                  <div class="text-slate-400">Exterior Color</div>
+                  <div class="font-bold text-slate-900 mt-0.5" x-text="car.color"></div>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-50">
+                  <div class="text-slate-400">Chassis / Frame No</div>
+                  <div class="font-mono font-bold text-slate-900 mt-0.5" x-text="car.chassisNo || 'On Request'"></div>
+                </div>
+              </div>
+
+              <!-- Description -->
+              <div class="mt-5">
+                <h2 class="text-sm font-bold text-slate-900 mb-2">Seller Description & Inspection Notes</h2>
+                <p class="text-sm text-slate-700 leading-relaxed whitespace-pre-line" x-text="car.description"></p>
+              </div>
+
+              <!-- Features -->
+              <template x-if="car.features && car.features.length > 0">
+                <div class="mt-6">
+                  <h3 class="text-sm font-bold text-slate-900 mb-2.5">Equipped Features</h3>
+                  <div class="flex flex-wrap gap-2">
+                    <template x-for="feat in car.features" :key="feat">
+                      <span class="px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold" x-text="'✓ ' + feat"></span>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: Seller Card, Compare, Inquiry & Reservation Forms -->
+        <div class="lg:col-span-4 space-y-6">
+          <!-- Seller / Dealer Trust Card -->
+          <div class="bg-white rounded-2xl border border-slate-200 p-6">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-400" x-text="car.sellerRole === 'dealer' ? 'Dealer Showroom' : 'Private Seller'"></span>
+              <span x-show="car.sellerVerified" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">✓ Admin Verified</span>
+              <span x-show="!car.sellerVerified" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">Unverified Seller</span>
+            </div>
+            <h3 class="text-lg font-bold text-slate-900" x-text="car.sellerName"></h3>
+            <template x-if="sellerProfile">
+              <div class="mt-2 text-xs text-slate-600 space-y-1">
+                <div x-show="sellerProfile.address" x-text="'📍 ' + sellerProfile.address"></div>
+                <div x-show="sellerProfile.licenseNo" x-text="'🪪 License/ID: ' + sellerProfile.licenseNo"></div>
+                <div x-show="sellerProfile.phone" x-text="'📞 ' + sellerProfile.phone"></div>
+              </div>
+            </template>
+
+            <div class="mt-4 flex flex-col gap-2">
+              <button @click="toggleCompare()" class="w-full py-2 rounded-xl border border-slate-300 text-xs font-bold hover:bg-slate-50 transition"
+                :class="compareIds.includes(car._id) ? 'bg-emerald-50 border-emerald-400 text-emerald-800' : 'text-slate-700'">
+                <span x-text="compareIds.includes(car._id) ? '✓ Added to Comparison (View Compare)' : '+ Add to 3-Car Comparison'"></span>
+              </button>
+              <template x-if="car.sellerRole === 'dealer'">
+                <a :href="'/storefront.html?dealerId=' + car.sellerId" class="w-full py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-center text-xs font-bold text-slate-800 transition">
+                  Visit Dealer Storefront →
+                </a>
+              </template>
+            </div>
+          </div>
+
+          <!-- Send Inquiry Box -->
+          <div class="bg-white rounded-2xl border border-slate-200 p-6">
+            <h3 class="text-base font-bold text-slate-900 mb-1">Ask Seller a Question</h3>
+            <p class="text-xs text-slate-500 mb-4">Inquire about auction sheet, service history, or inspection availability.</p>
+
+            <div x-show="inquirySuccess" x-text="inquirySuccess" class="mb-3 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-semibold"></div>
+            <div x-show="inquiryError" x-text="inquiryError" class="mb-3 p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 font-semibold"></div>
+
+            <form @submit.prevent="sendInquiry()" class="space-y-3">
+              <textarea x-model="inquiryMessage" rows="3" required placeholder="Hello, is this vehicle available for inspection this weekend?" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs"></textarea>
+              <button type="submit" class="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition">
+                Send Inquiry
+              </button>
+            </form>
+          </div>
+
+          <!-- Place Reservation Request Box -->
+          <div class="bg-white rounded-2xl border border-slate-200 p-6">
+            <h3 class="text-base font-bold text-slate-900 mb-1">Reserve Vehicle / Schedule Inspection</h3>
+            <p class="text-xs text-slate-500 mb-4">Creates a tracked reservation with a visible milestone timeline for both buyer and seller.</p>
+
+            <div x-show="reservationSuccess" x-text="reservationSuccess" class="mb-3 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-semibold"></div>
+            <div x-show="reservationError" x-text="reservationError" class="mb-3 p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 font-semibold"></div>
+
+            <form @submit.prevent="createReservation()" class="space-y-3">
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-[11px] font-semibold text-slate-600 mb-1">Hold Deposit (BDT)</label>
+                  <input type="number" x-model="reservationForm.depositAmount" min="5000" step="5000" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs" />
+                </div>
+                <div>
+                  <label class="block text-[11px] font-semibold text-slate-600 mb-1">Preferred Visit Date</label>
+                  <input type="date" x-model="reservationForm.preferredDate" required class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-600 mb-1">Inspection & Hold Notes</label>
+                <input type="text" x-model="reservationForm.notes" placeholder="e.g. Requesting 48h hold for diagnostic check" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs" />
+              </div>
+              <label class="flex items-center gap-2 text-xs text-slate-700">
+                <input type="checkbox" x-model="reservationForm.inspectionRequested" class="rounded text-emerald-600" />
+                <span>Include pre-purchase garage inspection slot</span>
+              </label>
+              <button type="submit" :disabled="car.status === 'sold'" class="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition disabled:opacity-50">
+                Request Reservation Hold
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </template>
+  </main>
+
+  <div id="motosheba-footer"></div>
+
+  <script>
+    function listingDetailPage() {
+      return {
+        loading: true,
+        car: null,
+        sellerProfile: null,
+        activeImage: '',
+        compareIds: window.MotoApi.getCompareIds(),
+        inquiryMessage: '',
+        inquirySuccess: '',
+        inquiryError: '',
+        reservationSuccess: '',
+        reservationError: '',
+        reservationForm: {
+          depositAmount: 20000,
+          preferredDate: new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10),
+          notes: '',
+          inspectionRequested: true
+        },
+        async init() {
+          const id = new URLSearchParams(window.location.search).get('id');
+          if (!id) {
+            this.loading = false;
+            return;
+          }
+          try {
+            const res = await window.MotoApi.get('/api/listings/' + encodeURIComponent(id));
+            this.car = res.listing;
+            this.sellerProfile = res.sellerProfile;
+            if (this.car && this.car.images && this.car.images[0]) {
+              this.activeImage = this.car.images[0];
+            }
+          } catch (err) {
+            console.error(err);
+          } finally {
+            this.loading = false;
+          }
+        },
+        toggleCompare() {
+          if (!this.car) return;
+          try {
+            const res = window.MotoApi.toggleCompare(this.car._id);
+            this.compareIds = res.ids;
+          } catch (err) {
+            alert(err.message);
+          }
+        },
+        async sendInquiry() {
+          this.inquirySuccess = '';
+          this.inquiryError = '';
+          try {
+            await window.MotoApi.post('/api/inquiries', {
+              listingId: this.car._id,
+              message: this.inquiryMessage
+            });
+            this.inquiryMessage = '';
+            this.inquirySuccess = 'Inquiry sent! View replies in your Inquiries tab.';
+          } catch (err) {
+            if (err.status === 401) {
+              window.location.href = '/login.html';
+              return;
+            }
+            this.inquiryError = err.message;
+          }
+        },
+        async createReservation() {
+          this.reservationSuccess = '';
+          this.reservationError = '';
+          try {
+            await window.MotoApi.post('/api/reservations', {
+              listingId: this.car._id,
+              ...this.reservationForm
+            });
+            this.reservationSuccess = 'Reservation created! Redirecting to your Reservation Timeline...';
+            setTimeout(() => {
+              window.location.href = '/reservations.html';
+            }, 900);
+          } catch (err) {
+            if (err.status === 401) {
+              window.location.href = '/login.html';
+              return;
+            }
+            this.reservationError = err.message;
+          }
+        }
+      };
+    }
+  </script>
+</body>
+</html>

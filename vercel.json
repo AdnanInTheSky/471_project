@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "rewrites": [
+    { "source": "/api/listings/:id", "destination": "/api/listings/[id].js" },
+    { "source": "/api/reservations/:id", "destination": "/api/reservations/[id].js" },
+    { "source": "/api/admin/verify/:id", "destination": "/api/admin/verify/[id].js" },
+    { "source": "/api/admin/listings/:id", "destination": "/api/admin/listings/[id].js" },
+    { "source": "/((?!api/).*)", "destination": "/public/$1" }
+  ]
+}

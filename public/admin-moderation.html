@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Listing Moderation · MotoSheba</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/js/api.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
+  <div id="motosheba-navbar"></div>
+
+  <main x-data="adminModerationPage()" x-init="init()" class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div>
+        <div class="text-xs font-bold uppercase tracking-wider text-amber-600">Administrator Governance</div>
+        <h1 class="text-2xl font-bold text-slate-900">Listing Moderation Queue</h1>
+      </div>
+      <div class="flex flex-wrap gap-2 text-xs font-semibold">
+        <a href="/admin-verify.html" class="px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-slate-700 hover:bg-slate-50">1. Verify Queue</a>
+        <a href="/admin-moderation.html" class="px-3.5 py-2 rounded-xl bg-slate-900 text-white">2. Listing Moderation</a>
+        <a href="/admin-users.html" class="px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-slate-700 hover:bg-slate-50">3. Users</a>
+        <a href="/admin-audit.html" class="px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-slate-700 hover:bg-slate-50">4. Audit Log</a>
+      </div>
+    </div>
+
+    <div x-show="message" x-text="message" class="mb-4 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-semibold"></div>
+
+    <template x-if="!loading && !authorized">
+      <div class="bg-white rounded-2xl border border-slate-200 p-10 text-center">
+        <h2 class="text-lg font-bold mb-2">Administrator Access Required</h2>
+        <a href="/login.html" class="inline-block px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold">Sign In as Admin</a>
+      </div>
+    </template>
+
+    <template x-if="!loading && authorized">
+      <div class="space-y-4">
+        <div class="flex items-center gap-2 mb-2">
+          <button @click="statusFilter = ''" class="px-3 py-1.5 rounded-lg text-xs font-bold" :class="statusFilter === '' ? 'bg-slate-900 text-white' : 'bg-white border border-slate-300 text-slate-700'">All (<span x-text="listings.length"></span>)</button>
+          <button @click="statusFilter = 'pending'" class="px-3 py-1.5 rounded-lg text-xs font-bold" :class="statusFilter === 'pending' ? 'bg-amber-500 text-slate-950' : 'bg-white border border-slate-300 text-slate-700'">Pending Review (<span x-text="listings.filter(l => l.status === 'pending').length"></span>)</button>
+          <button @click="statusFilter = 'active'" class="px-3 py-1.5 rounded-lg text-xs font-bold" :class="statusFilter === 'active' ? 'bg-emerald-500 text-slate-950' : 'bg-white border border-slate-300 text-slate-700'">Active (<span x-text="listings.filter(l => l.status === 'active').length"></span>)</button>
+          <button @click="statusFilter = 'rejected'" class="px-3 py-1.5 rounded-lg text-xs font-bold" :class="statusFilter === 'rejected' ? 'bg-red-600 text-white' : 'bg-white border border-slate-300 text-slate-700'">Rejected (<span x-text="listings.filter(l => l.status === 'rejected').length"></span>)</button>
+        </div>
+
+        <template x-for="car in filteredListings" :key="car._id">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div class="flex items-start gap-4">
+              <img :src="(car.images && car.images[0]) || 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=900&q=80'" class="w-24 h-18 rounded-xl object-cover bg-slate-100 shrink-0" />
+              <div>
+                <div class="flex items-center gap-2">
+                  <a :href="'/listing.html?id=' + car._id" class="text-sm font-bold text-slate-900 hover:text-emerald-600" x-text="car.title"></a>
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
+                    :class="{
+                      'bg-emerald-100 text-emerald-800': car.status === 'active',
+                      'bg-amber-100 text-amber-800': car.status === 'pending' || car.status === 'reserved',
+                      'bg-red-100 text-red-800': car.status === 'rejected'
+                    }"
+                    x-text="car.status"></span>
+                </div>
+                <div class="text-xs text-slate-600 mt-1">
+                  <span class="font-bold text-emerald-700" x-text="MotoApi.formatBDT(car.price)"></span>
+                  <span> · Seller: <strong x-text="car.sellerName"></strong></span>
+                  <span x-show="car.sellerVerified" class="text-emerald-600 font-bold"> (Verified)</span>
+                  <span> · Chassis: <strong class="font-mono" x-text="car.chassisNo || 'N/A'"></strong></span>
+                </div>
+                <div class="text-xs text-slate-500 mt-0.5 italic" x-text="'Moderation Note: ' + (car.moderationNotes || 'None')"></div>
+              </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <input type="text" x-model="modNotes[car._id]" placeholder="Moderation reason..." class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs w-full sm:w-48" />
+              <button @click="moderate(car._id, 'active')" class="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs">Approve</button>
+              <button @click="moderate(car._id, 'pending')" class="px-3.5 py-1.5 rounded-xl bg-amber-500/20 text-amber-900 border border-amber-400 font-semibold text-xs">Flag Pending</button>
+              <button @click="moderate(car._id, 'rejected')" class="px-3.5 py-1.5 rounded-xl border border-red-300 text-red-700 hover:bg-red-50 font-semibold text-xs">Reject</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </template>
+  </main>
+
+  <div id="motosheba-footer"></div>
+
+  <script>
+    function adminModerationPage() {
+      return {
+        loading: true,
+        authorized: false,
+        listings: [],
+        statusFilter: '',
+        modNotes: {},
+        message: '',
+        get filteredListings() {
+          if (!this.statusFilter) return this.listings;
+          return this.listings.filter((l) => l.status === this.statusFilter);
+        },
+        async init() {
+          await this.loadQueue();
+        },
+        async loadQueue() {
+          this.loading = true;
+          try {
+            const res = await window.MotoApi.get('/api/admin/queue');
+            this.authorized = true;
+            this.listings = res.listings || [];
+          } catch (err) {
+            this.authorized = false;
+          } finally {
+            this.loading = false;
+          }
+        },
+        async moderate(listingId, status) {
+          this.message = '';
+          try {
+            const moderationNotes = this.modNotes[listingId] || '';
+            await window.MotoApi.patch('/api/admin/listings/' + listingId, {
+              status,
+              moderationNotes
+            });
+            this.modNotes[listingId] = '';
+            this.message = `Listing status updated to "${status}" and logged to audit trail.`;
+            await this.loadQueue();
+          } catch (err) {
+            alert(err.message);
+          }
+        }
+      };
+    }
+  </script>
+</body>
+</html>

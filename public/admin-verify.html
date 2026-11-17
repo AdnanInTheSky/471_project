@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Verification Queue · MotoSheba</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/js/api.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
+  <div id="motosheba-navbar"></div>
+
+  <main x-data="adminVerifyPage()" x-init="init()" class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Admin Subnav -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div>
+        <div class="text-xs font-bold uppercase tracking-wider text-amber-600">Administrator Governance</div>
+        <h1 class="text-2xl font-bold text-slate-900">Seller & Dealer Verification Queue</h1>
+      </div>
+      <div class="flex flex-wrap gap-2 text-xs font-semibold">
+        <a href="/admin-verify.html" class="px-3.5 py-2 rounded-xl bg-slate-900 text-white">1. Verify Queue</a>
+        <a href="/admin-moderation.html" class="px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-slate-700 hover:bg-slate-50">2. Listing Moderation</a>
+        <a href="/admin-users.html" class="px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-slate-700 hover:bg-slate-50">3. Users</a>
+        <a href="/admin-audit.html" class="px-3.5 py-2 rounded-xl bg-white border border-slate-300 text-slate-700 hover:bg-slate-50">4. Audit Log</a>
+      </div>
+    </div>
+
+    <div x-show="message" x-text="message" class="mb-4 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-semibold"></div>
+    <div x-show="error" x-text="error" class="mb-4 p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 font-semibold"></div>
+
+    <template x-if="!loading && !authorized">
+      <div class="bg-white rounded-2xl border border-slate-200 p-10 text-center">
+        <h2 class="text-lg font-bold mb-2">Administrator Access Required</h2>
+        <p class="text-xs text-slate-500 mb-4">Sign in as admin@motosheba.com to access the verification queue.</p>
+        <a href="/login.html" class="inline-block px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold">Sign In as Admin</a>
+      </div>
+    </template>
+
+    <template x-if="!loading && authorized">
+      <div class="space-y-6">
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div class="bg-white rounded-2xl border border-slate-200 p-4">
+            <div class="text-xs text-slate-500">Pending Verifications</div>
+            <div class="text-2xl font-extrabold text-amber-600 mt-1" x-text="stats.pendingVerifications || 0"></div>
+          </div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-4">
+            <div class="text-xs text-slate-500">Verified Profiles</div>
+            <div class="text-2xl font-extrabold text-emerald-600 mt-1" x-text="stats.verifiedProfiles || 0"></div>
+          </div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-4">
+            <div class="text-xs text-slate-500">Pending Listings</div>
+            <div class="text-2xl font-extrabold text-amber-600 mt-1" x-text="stats.pendingListings || 0"></div>
+          </div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-4">
+            <div class="text-xs text-slate-500">Total Users</div>
+            <div class="text-2xl font-extrabold text-slate-900 mt-1" x-text="stats.totalUsers || 0"></div>
+          </div>
+        </div>
+
+        <!-- Profiles List -->
+        <div class="space-y-4">
+          <template x-for="prof in profiles" :key="prof._id">
+            <div class="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <span class="text-base font-bold text-slate-900" x-text="prof.businessName"></span>
+                  <span class="px-2 py-0.5 rounded text-[11px] font-bold uppercase bg-slate-100 text-slate-700" x-text="prof.role"></span>
+                  <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase"
+                    :class="{
+                      'bg-emerald-100 text-emerald-800': prof.verificationStatus === 'verified',
+                      'bg-amber-100 text-amber-800': prof.verificationStatus === 'pending',
+                      'bg-red-100 text-red-800': prof.verificationStatus === 'rejected',
+                      'bg-slate-100 text-slate-600': prof.verificationStatus === 'unsubmitted'
+                    }"
+                    x-text="prof.verificationStatus"></span>
+                </div>
+                <div class="text-xs text-slate-600">
+                  <span>Account: <strong x-text="prof.ownerName"></strong> (<span x-text="prof.ownerEmail"></span>)</span>
+                  <span> · Trade License / NID: <strong class="font-mono" x-text="prof.licenseNo || 'Not provided'"></strong></span>
+                  <span x-show="prof.tinNo"> · TIN: <strong class="font-mono" x-text="prof.tinNo"></strong></span>
+                </div>
+                <div class="text-xs text-slate-500" x-show="prof.address" x-text="'Address: ' + prof.address + ' (' + prof.city + ')'"></div>
+                <div class="text-xs text-slate-500 italic" x-show="prof.verificationNotes" x-text="'Current Note: ' + prof.verificationNotes"></div>
+              </div>
+
+              <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <input type="text" x-model="notes[prof._id]" placeholder="Verification audit note..." class="px-3 py-2 rounded-xl border border-slate-300 text-xs w-full sm:w-56" />
+                <button @click="decide(prof._id, 'verified')" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs">
+                  ✓ Approve & Verify
+                </button>
+                <button @click="decide(prof._id, 'rejected')" class="px-4 py-2 rounded-xl border border-red-300 text-red-700 hover:bg-red-50 font-semibold text-xs">
+                  Reject
+                </button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
+  </main>
+
+  <div id="motosheba-footer"></div>
+
+  <script>
+    function adminVerifyPage() {
+      return {
+        loading: true,
+        authorized: false,
+        stats: {},
+        profiles: [],
+        notes: {},
+        message: '',
+        error: '',
+        async init() {
+          await this.loadQueue();
+        },
+        async loadQueue() {
+          this.loading = true;
+          try {
+            const res = await window.MotoApi.get('/api/admin/queue');
+            this.authorized = true;
+            this.stats = res.stats || {};
+            this.profiles = res.profiles || [];
+          } catch (err) {
+            this.authorized = false;
+          } finally {
+            this.loading = false;
+          }
+        },
+        async decide(profileId, verificationStatus) {
+          this.message = '';
+          this.error = '';
+          try {
+            const verificationNotes = this.notes[profileId] || '';
+            await window.MotoApi.patch('/api/admin/verify/' + profileId, {
+              verificationStatus,
+              verificationNotes
+            });
+            this.notes[profileId] = '';
+            this.message = `Profile updated to "${verificationStatus}" and logged in audit trail.`;
+            await this.loadQueue();
+          } catch (err) {
+            this.error = err.message;
+          }
+        }
+      };
+    }
+  </script>
+</body>
+</html>

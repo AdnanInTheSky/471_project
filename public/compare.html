@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Compare Vehicles · MotoSheba</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/js/api.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
+  <div id="motosheba-navbar"></div>
+
+  <main x-data="comparePage()" x-init="init()" class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div>
+        <h1 class="text-2xl font-bold text-slate-900">Compare Vehicles (Up to 3)</h1>
+        <p class="text-sm text-slate-500">Side-by-side specification, price, and seller verification comparison</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button x-show="listings.length > 0" @click="clearAll()" class="px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50">
+          Clear All
+        </button>
+        <a href="/listings.html" class="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800">
+          + Add Vehicles from Marketplace
+        </a>
+      </div>
+    </div>
+
+    <!-- Quick Add Selector if fewer than 3 selected -->
+    <div x-show="listings.length < 3 && availableToPick.length > 0" class="mb-6 bg-white rounded-2xl border border-slate-200 p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <span class="text-xs font-semibold text-slate-700">Quick-add a vehicle to compare (<span x-text="3 - listings.length"></span> slot remaining):</span>
+      <div class="flex items-center gap-2 w-full sm:w-auto">
+        <select x-model="selectedToAdd" class="flex-1 sm:w-80 px-3 py-2 rounded-xl border border-slate-300 text-xs bg-white">
+          <option value="">Select a vehicle to add...</option>
+          <template x-for="item in availableToPick" :key="item._id">
+            <option :value="item._id" x-text="`${item.title} (${MotoApi.formatBDT(item.price)})`"></option>
+          </template>
+        </select>
+        <button @click="addSelected()" :disabled="!selectedToAdd" class="px-4 py-2 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs disabled:opacity-40">Add</button>
+      </div>
+    </div>
+
+    <template x-if="loading">
+      <div class="bg-white rounded-2xl border border-slate-200 p-12 text-center text-sm text-slate-500">Loading comparison table...</div>
+    </template>
+
+    <template x-if="!loading && listings.length === 0">
+      <div class="bg-white rounded-2xl border border-slate-200 p-12 text-center">
+        <h3 class="text-base font-bold text-slate-900 mb-1">No vehicles selected for comparison</h3>
+        <p class="text-xs text-slate-500 mb-4">Click "+ Compare" on up to three listings in the marketplace or pick one above.</p>
+        <a href="/listings.html" class="inline-block px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold">Browse Vehicles</a>
+      </div>
+    </template>
+
+    <template x-if="!loading && listings.length > 0">
+      <div class="bg-white rounded-2xl border border-slate-200 overflow-x-auto shadow-sm">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="border-b border-slate-200">
+              <th class="p-4 w-48 bg-slate-50 text-xs font-bold uppercase text-slate-500">Specification</th>
+              <template x-for="car in listings" :key="car._id">
+                <th class="p-4 min-w-[240px] border-l border-slate-200 align-top">
+                  <div class="relative h-36 rounded-xl overflow-hidden bg-slate-100 mb-3">
+                    <img :src="(car.images && car.images[0]) || 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=900&q=80'" class="w-full h-full object-cover" />
+                    <button @click="removeCar(car._id)" class="absolute top-2 right-2 px-2 py-0.5 rounded bg-slate-900/80 text-white text-[11px] hover:bg-red-600">Remove ×</button>
+                  </div>
+                  <a :href="'/listing.html?id=' + car._id" class="text-sm font-bold text-slate-900 hover:text-emerald-600 block mb-1" x-text="car.title"></a>
+                  <div class="text-lg font-extrabold text-emerald-600" x-text="MotoApi.formatBDT(car.price)"></div>
+                </th>
+              </template>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200 text-xs">
+            <tr>
+              <td class="p-3.5 bg-slate-50 font-semibold text-slate-700">Seller & Trust Badge</td>
+              <template x-for="car in listings" :key="car._id">
+                <td class="p-3.5 border-l border-slate-200">
+                  <span class="font-bold text-slate-900" x-text="car.sellerName"></span>
+                  <span x-show="car.sellerVerified" class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">✓ Verified</span>
+                  <span x-show="!car.sellerVerified" class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">Unverified</span>
+                </td>
+              </template>
+            </tr>
+            <tr>
+              <td class="p-3.5 bg-slate-50 font-semibold text-slate-700">Make & Model</td>
+              <template x-for="car in listings" :key="car._id">
+                <td class="p-3.5 border-l border-slate-200 font-medium" x-text="`${car.make} ${car.model}`"></td>
+              </template>
+            </tr>
+            <tr>
+              <td class="p-3.5 bg-slate-50 font-semibold text-slate-700">Condition</td>
+              <template x-for="car in listings" :key="car._id">
+                <td class="p-3.5 border-l border-slate-200 uppercase font-bold text-slate-800" x-text="car.condition"></td>
+              </template>
+            </tr>
+            <tr>
+              <td class="p-3.5 bg-slate-50 font-semibold text-slate-700">Model Year / Reg</td>
+              <template x-for="car in listings" :key="car._id">
+                <td class="p-3.5 border-l border-slate-200" x-text="`${car.year} (${car.registrationYear || 'Unregistered'})`"></td>
+              </template>
+            </tr>
+            <tr>
+              <td class="p-3.5 bg-slate-50 font-semibold text-slate-700">Mileage</td>
+              <template x-for="car in listings" :key="car._id">
+                <td class="p-3.5 border-l border-slate-200 font-semibold" x-text="`${(car.mileage || 0).toLocaleString()} km`"></td>
+              </template>
+            </tr>
+            <tr>
+              <td class="p-3.5 bg-slate-50 font-semibold text-slate-700">Engine & Fuel Type</td>
+              <template x-for="car in listings" :key="car._id">
+                <td class="p-3.5 border-l border-slate-200" x-text="`${car.engineCc || 1500} cc · ${car.fuelType}`"></td>
+              </template>
+            </tr>
+            <tr>
+              <td class="p-3.5 bg-slate-50 font-semibold text-slate-700">Transmission & Body</td>
+              <template x-for="car in listings" :key="car._id">
+                <td class="p-3.5 border-l border-slate-200" x-text="`${car.transmission} · ${car.bodyType}`"></td>
+              </template>
+            </tr>
+            <tr>
+              <td class="p-3.5 bg-slate-50 font-semibold text-slate-700">Location</td>
+              <template x-for="car in listings" :key="car._id">
+                <td class="p-3.5 border-l border-slate-200" x-text="car.location"></td>
+              </template>
+            </tr>
+            <tr>
+              <td class="p-3.5 bg-slate-50 font-semibold text-slate-700">Features</td>
+              <template x-for="car in listings" :key="car._id">
+                <td class="p-3.5 border-l border-slate-200">
+                  <div class="flex flex-wrap gap-1">
+                    <template x-for="f in (car.features || [])" :key="f">
+                      <span class="px-2 py-0.5 rounded bg-slate-100 text-[11px]" x-text="f"></span>
+                    </template>
+                  </div>
+                </td>
+              </template>
+            </tr>
+            <tr>
+              <td class="p-3.5 bg-slate-50 font-semibold text-slate-700">Action</td>
+              <template x-for="car in listings" :key="car._id">
+                <td class="p-3.5 border-l border-slate-200">
+                  <a :href="'/listing.html?id=' + car._id" class="inline-block px-4 py-2 rounded-xl bg-slate-900 text-white font-semibold text-xs hover:bg-slate-800">Inspect & Reserve →</a>
+                </td>
+              </template>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
+  </main>
+
+  <div id="motosheba-footer"></div>
+
+  <script>
+    function comparePage() {
+      return {
+        loading: true,
+        listings: [],
+        allCatalog: [],
+        selectedToAdd: '',
+        get availableToPick() {
+          const currentIds = this.listings.map((c) => c._id);
+          return this.allCatalog.filter((c) => !currentIds.includes(c._id));
+        },
+        async init() {
+          const urlIds = new URLSearchParams(window.location.search).get('ids');
+          if (urlIds) {
+            window.MotoApi.setCompareIds(urlIds.split(','));
+          }
+          await this.loadComparison();
+        },
+        async loadComparison() {
+          this.loading = true;
+          try {
+            const ids = window.MotoApi.getCompareIds();
+            const [compRes, allRes] = await Promise.all([
+              ids.length > 0
+                ? window.MotoApi.get('/api/compare?ids=' + encodeURIComponent(ids.join(',')))
+                : Promise.resolve({ listings: [] }),
+              window.MotoApi.get('/api/listings?limit=20')
+            ]);
+            this.listings = compRes.listings || [];
+            this.allCatalog = allRes.listings || [];
+          } catch (err) {
+            console.error(err);
+          } finally {
+            this.loading = false;
+          }
+        },
+        removeCar(id) {
+          const next = window.MotoApi.getCompareIds().filter((x) => x !== id);
+          window.MotoApi.setCompareIds(next);
+          this.loadComparison();
+        },
+        addSelected() {
+          if (!this.selectedToAdd) return;
+          try {
+            window.MotoApi.toggleCompare(this.selectedToAdd);
+            this.selectedToAdd = '';
+            this.loadComparison();
+          } catch (err) {
+            alert(err.message);
+          }
+        },
+        clearAll() {
+          window.MotoApi.clearCompare();
+          this.listings = [];
+        }
+      };
+    }
+  </script>
+</body>
+</html>

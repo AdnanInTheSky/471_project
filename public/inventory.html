@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dealer Inventory Dashboard · MotoSheba</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/js/api.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
+  <div id="motosheba-navbar"></div>
+
+  <main x-data="dealerInventoryPage()" x-init="init()" class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div>
+        <div class="text-xs font-bold uppercase tracking-wider text-emerald-600">Dealer Console</div>
+        <h1 class="text-2xl font-bold text-slate-900">Showroom Inventory Manager</h1>
+      </div>
+      <div class="flex items-center gap-2">
+        <a href="/leads.html" class="px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50">Manage Leads</a>
+        <a href="/staff.html" class="px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50">Manage Staff</a>
+        <a href="/my-listings.html" class="px-4 py-2 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs hover:bg-emerald-400">+ Add / Edit Vehicles</a>
+      </div>
+    </div>
+
+    <template x-if="!loading && (!user || !['dealer','admin'].includes(user.role))">
+      <div class="bg-white rounded-2xl border border-slate-200 p-10 text-center">
+        <h2 class="text-lg font-bold mb-2">Dealer Account Required</h2>
+        <p class="text-xs text-slate-500 mb-4">Sign in as a Dealer or Admin to manage showroom stock.</p>
+        <a href="/login.html" class="inline-block px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold">Sign In as Dealer</a>
+      </div>
+    </template>
+
+    <template x-if="!loading && user && ['dealer','admin'].includes(user.role)">
+      <div class="space-y-6">
+        <!-- Summary Metrics -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div class="bg-white rounded-2xl border border-slate-200 p-4">
+            <div class="text-xs text-slate-500">Total Stock Units</div>
+            <div class="text-2xl font-extrabold text-slate-900 mt-1" x-text="listings.length"></div>
+          </div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-4">
+            <div class="text-xs text-slate-500">Active Available</div>
+            <div class="text-2xl font-extrabold text-emerald-600 mt-1" x-text="listings.filter(c => c.status === 'active').length"></div>
+          </div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-4">
+            <div class="text-xs text-slate-500">Reserved / On Hold</div>
+            <div class="text-2xl font-extrabold text-amber-600 mt-1" x-text="listings.filter(c => c.status === 'reserved').length"></div>
+          </div>
+          <div class="bg-white rounded-2xl border border-slate-200 p-4">
+            <div class="text-xs text-slate-500">Total Stock Value</div>
+            <div class="text-lg font-extrabold text-slate-900 mt-1" x-text="MotoApi.formatBDT(totalValue)"></div>
+          </div>
+        </div>
+
+        <div x-show="message" x-text="message" class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-semibold"></div>
+
+        <!-- Inventory Table -->
+        <div class="bg-white rounded-2xl border border-slate-200 overflow-x-auto shadow-xs">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase">
+                <th class="p-3.5">Vehicle</th>
+                <th class="p-3.5">Chassis / Year</th>
+                <th class="p-3.5">Mileage</th>
+                <th class="p-3.5">Price (BDT)</th>
+                <th class="p-3.5">Status</th>
+                <th class="p-3.5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200">
+              <template x-for="car in listings" :key="car._id">
+                <tr class="hover:bg-slate-50/80">
+                  <td class="p-3.5">
+                    <div class="font-bold text-slate-900" x-text="car.title"></div>
+                    <div class="text-slate-500" x-text="`${car.condition.toUpperCase()} · ${car.fuelType}`"></div>
+                  </td>
+                  <td class="p-3.5 font-mono text-slate-700" x-text="`${car.chassisNo || 'N/A'} (${car.year})`"></td>
+                  <td class="p-3.5" x-text="`${(car.mileage||0).toLocaleString()} km`"></td>
+                  <td class="p-3.5 font-bold text-emerald-700" x-text="MotoApi.formatBDT(car.price)"></td>
+                  <td class="p-3.5">
+                    <select @change="updateStatus(car._id, $event.target.value)" :value="car.status" class="px-2.5 py-1 rounded-lg border border-slate-300 bg-white font-semibold">
+                      <option value="active">Active</option>
+                      <option value="reserved">Reserved</option>
+                      <option value="sold">Sold</option>
+                    </select>
+                  </td>
+                  <td class="p-3.5 text-right space-x-2">
+                    <a :href="'/listing.html?id=' + car._id" class="text-emerald-600 font-semibold hover:underline">View</a>
+                    <a href="/my-listings.html" class="text-slate-700 font-semibold hover:underline">Edit</a>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </template>
+  </main>
+
+  <div id="motosheba-footer"></div>
+
+  <script>
+    function dealerInventoryPage() {
+      return {
+        loading: true,
+        user: null,
+        listings: [],
+        message: '',
+        get totalValue() {
+          return this.listings.reduce((acc, c) => acc + (Number(c.price) || 0), 0);
+        },
+        async init() {
+          try {
+            const auth = await window.MotoApi.get('/api/auth/me');
+            this.user = auth.user;
+            if (this.user && ['dealer', 'admin'].includes(this.user.role)) {
+              await this.loadStock();
+            }
+          } catch (err) {
+            console.error(err);
+          } finally {
+            this.loading = false;
+          }
+        },
+        async loadStock() {
+          const res = await window.MotoApi.get('/api/listings?mine=1&limit=50');
+          this.listings = res.listings || [];
+        },
+        async updateStatus(id, status) {
+          this.message = '';
+          try {
+            await window.MotoApi.patch('/api/listings/' + id, { status });
+            this.message = 'Inventory unit status updated to ' + status;
+            await this.loadStock();
+          } catch (err) {
+            alert(err.message);
+          }
+        }
+      };
+    }
+  </script>
+</body>
+</html>

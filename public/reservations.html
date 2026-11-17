@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reservations & Status Timeline · MotoSheba</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/js/api.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
+  <div id="motosheba-navbar"></div>
+
+  <main x-data="reservationsPage()" x-init="init()" class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="mb-6">
+      <h1 class="text-2xl font-bold text-slate-900">Vehicle Reservations & Timeline</h1>
+      <p class="text-sm text-slate-500">Track vehicle holds, inspection scheduling, and handover milestones with full audit logging</p>
+    </div>
+
+    <div x-show="message" x-text="message" class="mb-4 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-semibold"></div>
+
+    <template x-if="loading">
+      <div class="bg-white rounded-2xl border border-slate-200 p-10 text-center text-sm text-slate-500">Loading reservations...</div>
+    </template>
+
+    <template x-if="!loading && !user">
+      <div class="bg-white rounded-2xl border border-slate-200 p-10 text-center">
+        <p class="text-sm text-slate-600 mb-4">Please sign in to view and manage your reservations.</p>
+        <a href="/login.html" class="inline-block px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold">Sign In</a>
+      </div>
+    </template>
+
+    <template x-if="!loading && user">
+      <div class="space-y-6">
+        <template x-if="reservations.length === 0">
+          <div class="bg-white rounded-2xl border border-slate-200 p-10 text-center text-sm text-slate-500">
+            No active reservations yet. Open any vehicle listing to place a reservation request.
+          </div>
+        </template>
+
+        <template x-for="resv in reservations" :key="resv._id">
+          <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-xs">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+              <div>
+                <a :href="'/listing.html?id=' + resv.listingId" class="text-lg font-bold text-slate-900 hover:text-emerald-600" x-text="resv.listingTitle"></a>
+                <div class="text-xs text-slate-500 mt-1">
+                  <span>Listing Price: <strong class="text-slate-800" x-text="MotoApi.formatBDT(resv.listingPrice)"></strong></span>
+                  <span> · Hold Deposit: <strong class="text-emerald-700" x-text="MotoApi.formatBDT(resv.depositAmount)"></strong></span>
+                  <span> · Preferred Date: <strong x-text="resv.preferredDate"></strong></span>
+                </div>
+                <div class="text-xs text-slate-500 mt-0.5">
+                  <span>Buyer: <strong x-text="resv.buyerName"></strong></span>
+                  <span> · Seller/Dealer: <strong x-text="resv.sellerName"></strong></span>
+                </div>
+              </div>
+              <span class="px-3 py-1 rounded-full text-xs font-bold uppercase self-start md:self-center"
+                :class="{
+                  'bg-amber-100 text-amber-800': resv.status === 'pending',
+                  'bg-blue-100 text-blue-800': resv.status === 'confirmed' || resv.status === 'inspection_scheduled',
+                  'bg-emerald-100 text-emerald-800': resv.status === 'completed',
+                  'bg-red-100 text-red-800': resv.status === 'cancelled'
+                }"
+                x-text="resv.status.replace('_', ' ')"></span>
+            </div>
+
+            <!-- Visible Timeline -->
+            <div class="mt-4">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Status History Timeline</h3>
+              <div class="space-y-3 border-l-2 border-emerald-500 pl-4 ml-2">
+                <template x-for="(step, idx) in (resv.timeline || [])" :key="idx">
+                  <div class="relative">
+                    <div class="flex flex-wrap items-center gap-2 text-xs">
+                      <span class="px-2 py-0.5 rounded bg-slate-900 text-white font-bold uppercase text-[10px]" x-text="step.status.replace('_', ' ')"></span>
+                      <span class="font-semibold text-slate-800" x-text="step.actorName"></span>
+                      <span class="text-slate-400" x-text="MotoApi.formatDateTime(step.at)"></span>
+                    </div>
+                    <p class="text-xs text-slate-600 mt-1" x-text="step.note"></p>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <!-- Controls for Seller / Dealer / Admin or Buyer Cancel -->
+            <div class="mt-5 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <input type="text" x-model="notesMap[resv._id]" placeholder="Add milestone note (e.g. Inspection bay booked for 11 AM)" class="flex-1 px-3 py-2 rounded-xl border border-slate-300 text-xs" />
+
+              <div class="flex flex-wrap items-center gap-2">
+                <template x-if="user.role === 'admin' || String(user._id) === String(resv.sellerId)">
+                  <div class="flex flex-wrap gap-1.5">
+                    <button @click="updateStatus(resv._id, 'confirmed')" class="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold">Confirm Hold</button>
+                    <button @click="updateStatus(resv._id, 'inspection_scheduled')" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold">Schedule Inspection</button>
+                    <button @click="updateStatus(resv._id, 'completed')" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold">Mark Sold / Completed</button>
+                  </div>
+                </template>
+                <button x-show="resv.status !== 'cancelled' && resv.status !== 'completed'" @click="updateStatus(resv._id, 'cancelled')" class="px-3 py-1.5 rounded-lg border border-red-300 text-red-700 hover:bg-red-50 text-xs font-semibold">
+                  Cancel Reservation
+                </button>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </template>
+  </main>
+
+  <div id="motosheba-footer"></div>
+
+  <script>
+    function reservationsPage() {
+      return {
+        loading: true,
+        user: null,
+        reservations: [],
+        notesMap: {},
+        message: '',
+        async init() {
+          try {
+            const auth = await window.MotoApi.get('/api/auth/me');
+            this.user = auth.user;
+            if (this.user) {
+              await this.loadReservations();
+            }
+          } catch (err) {
+            console.error(err);
+          } finally {
+            this.loading = false;
+          }
+        },
+        async loadReservations() {
+          const res = await window.MotoApi.get('/api/reservations');
+          this.reservations = res.reservations || [];
+        },
+        async updateStatus(id, status) {
+          this.message = '';
+          try {
+            const note = this.notesMap[id] || '';
+            await window.MotoApi.patch('/api/reservations/' + id, { status, note });
+            this.notesMap[id] = '';
+            this.message = `Reservation updated to "${status.replace('_', ' ')}".`;
+            await this.loadReservations();
+          } catch (err) {
+            alert(err.message);
+          }
+        }
+      };
+    }
+  </script>
+</body>
+</html>

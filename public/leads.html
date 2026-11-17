@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dealer Leads & Inquiries · MotoSheba</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/js/api.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
+  <div id="motosheba-navbar"></div>
+
+  <main x-data="dealerLeadsPage()" x-init="init()" class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div>
+        <div class="text-xs font-bold uppercase tracking-wider text-emerald-600">Dealer Console</div>
+        <h1 class="text-2xl font-bold text-slate-900">Buyer Leads & Reservation Pipeline</h1>
+      </div>
+      <div class="flex items-center gap-2">
+        <a href="/inventory.html" class="px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700">Inventory</a>
+        <a href="/staff.html" class="px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700">Staff Roster</a>
+      </div>
+    </div>
+
+    <template x-if="!loading && (!user || !['dealer','seller','admin'].includes(user.role))">
+      <div class="bg-white rounded-2xl border border-slate-200 p-10 text-center">
+        <h2 class="text-lg font-bold mb-2">Dealer or Seller Account Required</h2>
+        <a href="/login.html" class="inline-block px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold">Sign In</a>
+      </div>
+    </template>
+
+    <template x-if="!loading && user && ['dealer','seller','admin'].includes(user.role)">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Column 1: Reservations Pipeline -->
+        <div class="space-y-4">
+          <h2 class="text-base font-bold text-slate-900">Reservation Holds (<span x-text="reservations.length"></span>)</h2>
+          <template x-for="resv in reservations" :key="resv._id">
+            <div class="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-900" x-text="resv.listingTitle"></span>
+                <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-emerald-100 text-emerald-800" x-text="resv.status"></span>
+              </div>
+              <div class="text-xs text-slate-600">
+                <div>Buyer: <strong x-text="resv.buyerName"></strong> (<span x-text="resv.buyerEmail"></span>)</div>
+                <div>Deposit Intent: <strong x-text="MotoApi.formatBDT(resv.depositAmount)"></strong> · Visit Date: <strong x-text="resv.preferredDate"></strong></div>
+              </div>
+              <div class="flex flex-wrap gap-1.5 pt-2 border-t border-slate-100">
+                <button @click="setReservationStatus(resv._id, 'confirmed')" class="px-2.5 py-1 rounded-lg bg-blue-600 text-white text-xs font-semibold">Confirm Hold</button>
+                <button @click="setReservationStatus(resv._id, 'inspection_scheduled')" class="px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-xs font-semibold">Schedule Inspection</button>
+                <button @click="setReservationStatus(resv._id, 'completed')" class="px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-xs font-semibold">Complete Sale</button>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- Column 2: Buyer Inquiries -->
+        <div class="space-y-4">
+          <h2 class="text-base font-bold text-slate-900">Buyer Questions (<span x-text="inquiries.length"></span>)</h2>
+          <template x-for="inq in inquiries" :key="inq._id">
+            <div class="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-900" x-text="inq.listingTitle"></span>
+                <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase"
+                  :class="inq.status === 'replied' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'"
+                  x-text="inq.status"></span>
+              </div>
+              <p class="text-xs text-slate-700 bg-slate-50 p-3 rounded-xl" x-text="`${inq.buyerName}: \"${inq.message}\"`"></p>
+              <form @submit.prevent="replyInquiry(inq._id)" class="flex gap-2">
+                <input type="text" x-model="replyText[inq._id]" required placeholder="Send showroom response..." class="flex-1 px-3 py-1.5 rounded-lg border border-slate-300 text-xs" />
+                <button type="submit" class="px-3.5 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold">Send</button>
+              </form>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
+  </main>
+
+  <div id="motosheba-footer"></div>
+
+  <script>
+    function dealerLeadsPage() {
+      return {
+        loading: true,
+        user: null,
+        inquiries: [],
+        reservations: [],
+        replyText: {},
+        async init() {
+          try {
+            const auth = await window.MotoApi.get('/api/auth/me');
+            this.user = auth.user;
+            if (this.user) {
+              await this.reloadAll();
+            }
+          } catch (err) {
+            console.error(err);
+          } finally {
+            this.loading = false;
+          }
+        },
+        async reloadAll() {
+          const [inqRes, resvRes] = await Promise.all([
+            window.MotoApi.get('/api/inquiries'),
+            window.MotoApi.get('/api/reservations')
+          ]);
+          this.inquiries = inqRes.inquiries || [];
+          this.reservations = resvRes.reservations || [];
+        },
+        async replyInquiry(inquiryId) {
+          const msg = this.replyText[inquiryId];
+          if (!msg) return;
+          await window.MotoApi.patch('/api/inquiries', { inquiryId, replyMessage: msg });
+          this.replyText[inquiryId] = '';
+          await this.reloadAll();
+        },
+        async setReservationStatus(id, status) {
+          await window.MotoApi.patch('/api/reservations/' + id, {
+            status,
+            note: `Updated via Dealer Leads Console to ${status}`
+          });
+          await this.reloadAll();
+        }
+      };
+    }
+  </script>
+</body>
+</html>

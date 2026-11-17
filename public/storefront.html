@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dealer Storefronts · MotoSheba</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/js/api.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
+  <div id="motosheba-navbar"></div>
+
+  <main x-data="storefrontPage()" x-init="init()" class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Dealer Directory Bar -->
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+      <div>
+        <h1 class="text-2xl font-bold text-slate-900">Dealer Showrooms & Storefronts</h1>
+        <p class="text-sm text-slate-500">Explore verified BARVIDA & port importer showrooms across Bangladesh</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <template x-for="d in allDealers" :key="d.userId">
+          <button @click="selectDealer(d.userId)" class="px-3.5 py-1.5 rounded-xl text-xs font-bold border transition"
+            :class="selectedDealerId === d.userId ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'">
+            <span x-text="d.businessName"></span>
+            <span x-show="d.verificationStatus === 'verified'" class="text-emerald-400 ml-1">✓</span>
+          </button>
+        </template>
+      </div>
+    </div>
+
+    <template x-if="loading">
+      <div class="bg-white rounded-2xl border border-slate-200 p-12 text-center text-sm text-slate-500">Loading dealer storefront...</div>
+    </template>
+
+    <template x-if="!loading && storefront">
+      <div class="space-y-8">
+        <!-- Banner Card -->
+        <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white rounded-2xl p-8 border border-slate-800 shadow-md">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <div class="flex items-center gap-2.5 mb-2">
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase bg-emerald-500 text-slate-950" x-show="storefront.verified">✓ Verified Showroom</span>
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase bg-amber-500 text-slate-950" x-show="!storefront.verified" x-text="'Verification: ' + storefront.verificationStatus"></span>
+                <span class="text-xs text-slate-400" x-show="storefront.licenseNo" x-text="'Trade License: ' + storefront.licenseNo"></span>
+              </div>
+              <h2 class="text-2xl sm:text-3xl font-extrabold" x-text="storefront.name"></h2>
+              <p class="text-sm text-slate-300 mt-2 max-w-2xl" x-text="storefront.bio || 'Authorized automobile dealership on MotoSheba.'"></p>
+              <div class="flex flex-wrap gap-4 mt-4 text-xs text-slate-300">
+                <span x-show="storefront.address" x-text="'📍 ' + storefront.address"></span>
+                <span x-show="storefront.phone" x-text="'📞 ' + storefront.phone"></span>
+                <span x-show="storefront.email" x-text="'✉️ ' + storefront.email"></span>
+              </div>
+            </div>
+            <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-4 min-w-[200px] text-center">
+              <div class="text-3xl font-extrabold text-emerald-400" x-text="listings.length"></div>
+              <div class="text-xs text-slate-400 mt-0.5">Active Showroom Vehicles</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Showroom Staff Section -->
+        <template x-if="storefront.staff && storefront.staff.length > 0">
+          <div class="bg-white rounded-2xl border border-slate-200 p-6">
+            <h3 class="text-base font-bold text-slate-900 mb-3">Showroom Sales & Documentation Desk</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              <template x-for="member in storefront.staff" :key="member.id">
+                <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                  <div class="font-bold text-slate-900 text-sm" x-text="member.name"></div>
+                  <div class="text-emerald-700 font-semibold mt-0.5" x-text="member.title"></div>
+                  <div class="text-slate-500 mt-2" x-show="member.phone" x-text="'📞 ' + member.phone"></div>
+                  <div class="text-slate-500" x-show="member.email" x-text="'✉️ ' + member.email"></div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+
+        <!-- Showroom Inventory Grid -->
+        <div>
+          <h3 class="text-lg font-bold text-slate-900 mb-4">Showroom Inventory (<span x-text="listings.length"></span>)</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <template x-for="car in listings" :key="car._id">
+              <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs flex flex-col">
+                <div class="relative h-48 bg-slate-100">
+                  <img :src="(car.images && car.images[0]) || 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=900&q=80'" class="w-full h-full object-cover" />
+                  <span class="absolute top-3 left-3 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase bg-slate-900/85 text-white" x-text="car.condition"></span>
+                </div>
+                <div class="p-5 flex-1 flex flex-col justify-between">
+                  <div>
+                    <div class="text-xs text-slate-500 mb-1" x-text="`${car.year} · ${(car.mileage||0).toLocaleString()} km · ${car.fuelType}`"></div>
+                    <a :href="'/listing.html?id=' + car._id" class="text-base font-bold text-slate-900 hover:text-emerald-600 block mb-2" x-text="car.title"></a>
+                    <div class="text-xl font-extrabold text-emerald-600 mb-3" x-text="MotoApi.formatBDT(car.price)"></div>
+                  </div>
+                  <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+                    <span class="text-xs text-slate-500" x-text="'Status: ' + car.status"></span>
+                    <a :href="'/listing.html?id=' + car._id" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold">Inspect →</a>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </template>
+  </main>
+
+  <div id="motosheba-footer"></div>
+
+  <script>
+    function storefrontPage() {
+      return {
+        loading: true,
+        selectedDealerId: '',
+        storefront: null,
+        listings: [],
+        allDealers: [],
+        async init() {
+          const urlId = new URLSearchParams(window.location.search).get('dealerId');
+          const dirRes = await window.MotoApi.get('/api/storefront');
+          this.allDealers = dirRes.dealers || [];
+          const defaultId = urlId || (this.allDealers[0] && this.allDealers[0].userId) || '';
+          if (defaultId) {
+            await this.selectDealer(defaultId);
+          } else {
+            this.loading = false;
+          }
+        },
+        async selectDealer(dealerId) {
+          this.selectedDealerId = dealerId;
+          this.loading = true;
+          try {
+            const res = await window.MotoApi.get('/api/storefront?dealerId=' + encodeURIComponent(dealerId));
+            this.storefront = res.storefront;
+            this.listings = res.listings || [];
+          } catch (err) {
+            console.error(err);
+          } finally {
+            this.loading = false;
+          }
+        }
+      };
+    }
+  </script>
+</body>
+</html>

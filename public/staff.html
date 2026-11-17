@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dealer Staff Management · MotoSheba</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/js/api.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
+  <div id="motosheba-navbar"></div>
+
+  <main x-data="dealerStaffPage()" x-init="init()" class="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div>
+        <div class="text-xs font-bold uppercase tracking-wider text-emerald-600">Dealer Console</div>
+        <h1 class="text-2xl font-bold text-slate-900">Showroom Staff Roster</h1>
+        <p class="text-sm text-slate-500">Manage sales executives and documentation officers displayed on your public storefront</p>
+      </div>
+      <a href="/storefront.html" class="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold">View Storefront →</a>
+    </div>
+
+    <div x-show="message" x-text="message" class="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-semibold"></div>
+
+    <template x-if="!loading && (!user || !['dealer','admin'].includes(user.role))">
+      <div class="bg-white rounded-2xl border border-slate-200 p-10 text-center">
+        <h2 class="text-lg font-bold mb-2">Dealer Role Required</h2>
+        <a href="/login.html" class="inline-block px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold">Sign In as Dealer</a>
+      </div>
+    </template>
+
+    <template x-if="!loading && user && ['dealer','admin'].includes(user.role)">
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+        <!-- Add Staff Form -->
+        <div class="md:col-span-5">
+          <form @submit.prevent="addStaff()" class="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
+            <h2 class="text-sm font-bold text-slate-900">Add Showroom Staff Member</h2>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Full Name *</label>
+              <input type="text" x-model="newStaff.name" required placeholder="e.g. Mahmudul Hasan" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Role / Designation *</label>
+              <input type="text" x-model="newStaff.title" required placeholder="Sales Executive / Finance Desk" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Phone Number</label>
+              <input type="text" x-model="newStaff.phone" placeholder="+88017..." class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Email</label>
+              <input type="email" x-model="newStaff.email" placeholder="staff@showroom.com" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs" />
+            </div>
+            <button type="submit" class="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs">
+              + Add to Showroom Team
+            </button>
+          </form>
+        </div>
+
+        <!-- Current Staff List -->
+        <div class="md:col-span-7 space-y-3">
+          <template x-if="staff.length === 0">
+            <div class="bg-white rounded-2xl border border-slate-200 p-8 text-center text-xs text-slate-500">
+              No staff members added yet.
+            </div>
+          </template>
+
+          <template x-for="member in staff" :key="member.id">
+            <div class="bg-white rounded-2xl border border-slate-200 p-4 flex items-center justify-between">
+              <div>
+                <div class="text-sm font-bold text-slate-900" x-text="member.name"></div>
+                <div class="text-xs font-semibold text-emerald-600" x-text="member.title"></div>
+                <div class="text-xs text-slate-500 mt-1" x-text="`${member.phone || ''} ${member.email ? '· ' + member.email : ''}`"></div>
+              </div>
+              <button @click="removeStaff(member.id)" class="px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold">
+                Remove
+              </button>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
+  </main>
+
+  <div id="motosheba-footer"></div>
+
+  <script>
+    function dealerStaffPage() {
+      return {
+        loading: true,
+        user: null,
+        staff: [],
+        message: '',
+        newStaff: {
+          name: '',
+          title: 'Sales Executive',
+          phone: '',
+          email: ''
+        },
+        async init() {
+          try {
+            const auth = await window.MotoApi.get('/api/auth/me');
+            this.user = auth.user;
+            if (auth.profile && Array.isArray(auth.profile.staff)) {
+              this.staff = auth.profile.staff;
+            }
+          } catch (err) {
+            console.error(err);
+          } finally {
+            this.loading = false;
+          }
+        },
+        async addStaff() {
+          const updated = [
+            ...this.staff,
+            {
+              id: 'st-' + Date.now(),
+              ...this.newStaff,
+              status: 'active',
+              addedAt: new Date().toISOString()
+            }
+          ];
+          const res = await window.MotoApi.patch('/api/auth/me', { staff: updated });
+          this.staff = (res.profile && res.profile.staff) || updated;
+          this.newStaff = { name: '', title: 'Sales Executive', phone: '', email: '' };
+          this.message = 'Staff member added to dealership profile.';
+        },
+        async removeStaff(id) {
+          const updated = this.staff.filter((m) => m.id !== id);
+          const res = await window.MotoApi.patch('/api/auth/me', { staff: updated });
+          this.staff = (res.profile && res.profile.staff) || updated;
+          this.message = 'Staff member removed.';
+        }
+      };
+    }
+  </script>
+</body>
+</html>

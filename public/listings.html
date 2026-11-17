@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Browse Vehicles · MotoSheba Marketplace</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/js/api.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
+  <div id="motosheba-navbar"></div>
+
+  <main x-data="listingsPage()" x-init="init()" class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      <div>
+        <h1 class="text-2xl font-bold text-slate-900">Vehicle Marketplace</h1>
+        <p class="text-sm text-slate-500">Search verified reconditioned, used, and new vehicles across Bangladesh</p>
+      </div>
+      <div class="flex items-center gap-2.5">
+        <a href="/compare.html" class="px-4 py-2 rounded-xl bg-white border border-slate-300 text-xs font-bold text-slate-800 hover:bg-slate-50">
+          Compare Tray (<span x-text="compareIds.length"></span>/3)
+        </a>
+        <a href="/my-listings.html" class="px-4 py-2 rounded-xl bg-emerald-500 text-slate-950 text-xs font-bold hover:bg-emerald-400">
+          + Post a Listing
+        </a>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <!-- Sidebar Filters -->
+      <aside class="lg:col-span-3">
+        <form @submit.prevent="applyFilters(1)" class="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 sticky top-20">
+          <div class="flex items-center justify-between">
+            <h2 class="text-sm font-bold text-slate-900">Search & Filters</h2>
+            <button type="button" @click="resetFilters()" class="text-xs text-emerald-600 hover:underline font-medium">Reset</button>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Keyword</label>
+            <input type="text" x-model="filters.q" placeholder="Corolla, Sunroof, Hybrid..." class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs" />
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Make</label>
+              <select x-model="filters.make" class="w-full px-2.5 py-2 rounded-lg border border-slate-300 text-xs bg-white">
+                <option value="">All</option>
+                <option value="Toyota">Toyota</option>
+                <option value="Honda">Honda</option>
+                <option value="Nissan">Nissan</option>
+                <option value="Mitsubishi">Mitsubishi</option>
+                <option value="Mazda">Mazda</option>
+                <option value="Hyundai">Hyundai</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Condition</label>
+              <select x-model="filters.condition" class="w-full px-2.5 py-2 rounded-lg border border-slate-300 text-xs bg-white">
+                <option value="">All</option>
+                <option value="reconditioned">Reconditioned</option>
+                <option value="used">Used</option>
+                <option value="new">New</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Model</label>
+            <input type="text" x-model="filters.model" placeholder="e.g. Premio, Civic, Prado" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs" />
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Min Price (BDT)</label>
+              <input type="number" x-model="filters.minPrice" placeholder="1500000" class="w-full px-2.5 py-2 rounded-lg border border-slate-300 text-xs" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Max Price (BDT)</label>
+              <input type="number" x-model="filters.maxPrice" placeholder="15000000" class="w-full px-2.5 py-2 rounded-lg border border-slate-300 text-xs" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Min Year</label>
+              <input type="number" x-model="filters.minYear" placeholder="2015" class="w-full px-2.5 py-2 rounded-lg border border-slate-300 text-xs" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Location</label>
+              <select x-model="filters.location" class="w-full px-2.5 py-2 rounded-lg border border-slate-300 text-xs bg-white">
+                <option value="">All Cities</option>
+                <option value="Dhaka">Dhaka</option>
+                <option value="Chattogram">Chattogram</option>
+                <option value="Sylhet">Sylhet</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Sort By</label>
+            <select x-model="filters.sort" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white">
+              <option value="newest">Newest Listed</option>
+              <option value="price_asc">Price: Low to High</option>
+              <option value="price_desc">Price: High to Low</option>
+              <option value="year_desc">Model Year: Newest</option>
+              <option value="mileage_asc">Mileage: Lowest First</option>
+            </select>
+          </div>
+
+          <label class="flex items-center gap-2 text-xs text-slate-700 font-medium cursor-pointer pt-1">
+            <input type="checkbox" x-model="filters.verifiedOnly" class="rounded text-emerald-600" />
+            <span>Verified Sellers & Dealers Only</span>
+          </label>
+
+          <button type="submit" class="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs transition">
+            Apply Filters
+          </button>
+        </form>
+      </aside>
+
+      <!-- Listings Results -->
+      <section class="lg:col-span-9">
+        <div class="flex items-center justify-between mb-4 text-xs text-slate-500">
+          <span x-text="`Showing ${listings.length} of ${pagination.total} vehicles (Page ${pagination.page} of ${pagination.totalPages})`"></span>
+        </div>
+
+        <template x-if="loading">
+          <div class="bg-white rounded-2xl border border-slate-200 p-12 text-center text-sm text-slate-500">Searching marketplace...</div>
+        </template>
+
+        <template x-if="!loading && listings.length === 0">
+          <div class="bg-white rounded-2xl border border-slate-200 p-12 text-center">
+            <h3 class="text-base font-bold text-slate-900 mb-1">No matching vehicles found</h3>
+            <p class="text-xs text-slate-500 mb-4">Try clearing one or more filters to broaden your search.</p>
+            <button @click="resetFilters()" class="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold">Reset Filters</button>
+          </div>
+        </template>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5" x-show="!loading && listings.length > 0">
+          <template x-for="car in listings" :key="car._id">
+            <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col">
+              <div class="relative h-48 bg-slate-100">
+                <img :src="(car.images && car.images[0]) || 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=900&q=80'" :alt="car.title" class="w-full h-full object-cover" />
+                <div class="absolute top-3 left-3 flex items-center gap-1.5">
+                  <span class="px-2.5 py-1 rounded-full text-[11px] font-bold uppercase bg-slate-900/85 text-white" x-text="car.condition"></span>
+                  <span x-show="car.status === 'reserved'" class="px-2.5 py-1 rounded-full text-[11px] font-bold uppercase bg-amber-500 text-slate-950">Reserved</span>
+                </div>
+                <button @click="toggleCompare(car._id)" class="absolute top-3 right-3 px-2.5 py-1 rounded-lg text-xs font-semibold transition" :class="compareIds.includes(car._id) ? 'bg-emerald-500 text-slate-950 font-bold' : 'bg-white/90 text-slate-800 hover:bg-white'">
+                  <span x-text="compareIds.includes(car._id) ? '✓ Comparing' : '+ Compare'"></span>
+                </button>
+              </div>
+              <div class="p-5 flex-1 flex flex-col justify-between">
+                <div>
+                  <div class="flex items-center justify-between text-xs text-slate-500 mb-1">
+                    <span x-text="`${car.year} · ${car.make} ${car.model}`"></span>
+                    <span x-text="`${(car.mileage || 0).toLocaleString()} km · ${car.location}`"></span>
+                  </div>
+                  <a :href="'/listing.html?id=' + car._id" class="text-base font-bold text-slate-900 hover:text-emerald-600 line-clamp-1 mb-2 block" x-text="car.title"></a>
+                  <div class="text-xl font-extrabold text-emerald-600 mb-3" x-text="MotoApi.formatBDT(car.price)"></div>
+                  <div class="flex flex-wrap gap-1.5 mb-4 text-xs text-slate-600">
+                    <span class="px-2 py-0.5 rounded bg-slate-100" x-text="car.fuelType"></span>
+                    <span class="px-2 py-0.5 rounded bg-slate-100" x-text="car.transmission"></span>
+                    <span class="px-2 py-0.5 rounded bg-slate-100" x-text="(car.engineCc || 1500) + ' cc'"></span>
+                  </div>
+                </div>
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+                  <div class="text-xs">
+                    <span class="font-semibold text-slate-800" x-text="car.sellerName"></span>
+                    <span x-show="car.sellerVerified" class="ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800">✓ Verified</span>
+                  </div>
+                  <a :href="'/listing.html?id=' + car._id" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800">Inspect →</a>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- Pagination -->
+        <div x-show="pagination.totalPages > 1" class="mt-8 flex items-center justify-center gap-2">
+          <button @click="applyFilters(pagination.page - 1)" :disabled="pagination.page <= 1" class="px-3.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-semibold disabled:opacity-40">Previous</button>
+          <span class="text-xs font-semibold text-slate-700" x-text="`Page ${pagination.page} of ${pagination.totalPages}`"></span>
+          <button @click="applyFilters(pagination.page + 1)" :disabled="pagination.page >= pagination.totalPages" class="px-3.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs font-semibold disabled:opacity-40">Next</button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div id="motosheba-footer"></div>
+
+  <script>
+    function listingsPage() {
+      return {
+        loading: true,
+        listings: [],
+        compareIds: window.MotoApi.getCompareIds(),
+        pagination: { page: 1, limit: 8, total: 0, totalPages: 1 },
+        filters: {
+          q: '',
+          make: '',
+          model: '',
+          condition: '',
+          minPrice: '',
+          maxPrice: '',
+          minYear: '',
+          location: '',
+          sort: 'newest',
+          verifiedOnly: false
+        },
+        init() {
+          const params = new URLSearchParams(window.location.search);
+          if (params.get('q')) this.filters.q = params.get('q');
+          if (params.get('make')) this.filters.make = params.get('make');
+          if (params.get('condition')) this.filters.condition = params.get('condition');
+          window.addEventListener('motosheba:compare', (e) => {
+            this.compareIds = e.detail || [];
+          });
+          this.applyFilters(1);
+        },
+        async applyFilters(page = 1) {
+          this.loading = true;
+          try {
+            const qs = new URLSearchParams();
+            qs.set('page', String(page));
+            qs.set('limit', '8');
+            for (const [k, v] of Object.entries(this.filters)) {
+              if (v !== '' && v !== false && v !== null) {
+                qs.set(k, String(v));
+              }
+            }
+            const res = await window.MotoApi.get('/api/listings?' + qs.toString());
+            this.listings = res.listings || [];
+            this.pagination = res.pagination || { page: 1, limit: 8, total: 0, totalPages: 1 };
+          } catch (err) {
+            console.error(err);
+          } finally {
+            this.loading = false;
+          }
+        },
+        resetFilters() {
+          this.filters = {
+            q: '',
+            make: '',
+            model: '',
+            condition: '',
+            minPrice: '',
+            maxPrice: '',
+            minYear: '',
+            location: '',
+            sort: 'newest',
+            verifiedOnly: false
+          };
+          this.applyFilters(1);
+        },
+        toggleCompare(id) {
+          try {
+            const res = window.MotoApi.toggleCompare(id);
+            this.compareIds = res.ids;
+          } catch (err) {
+            alert(err.message);
+          }
+        }
+      };
+    }
+  </script>
+</body>
+</html>

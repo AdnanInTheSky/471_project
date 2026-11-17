@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Profile & Verification · MotoSheba</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/js/api.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
+  <div id="motosheba-navbar"></div>
+
+  <main x-data="profilePage()" x-init="init()" class="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <template x-if="loading">
+      <div class="bg-white rounded-2xl border border-slate-200 p-8 text-center text-sm text-slate-500">Loading your account profile...</div>
+    </template>
+
+    <template x-if="!loading && !user">
+      <div class="bg-white rounded-2xl border border-slate-200 p-8 text-center">
+        <h2 class="text-lg font-bold mb-2">Please Sign In</h2>
+        <p class="text-sm text-slate-500 mb-4">You must be signed in to view and manage your profile.</p>
+        <a href="/login.html" class="inline-block px-5 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-semibold">Go to Sign In</a>
+      </div>
+    </template>
+
+    <template x-if="!loading && user">
+      <div class="space-y-6">
+        <!-- Header Card -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2.5 mb-1">
+              <h1 class="text-2xl font-bold text-slate-900" x-text="user.name"></h1>
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase bg-slate-900 text-white" x-text="user.role"></span>
+              <span x-show="user.verified" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">✓ Verified Account</span>
+              <span x-show="!user.verified" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">Unverified</span>
+            </div>
+            <p class="text-sm text-slate-500" x-text="user.email + (user.phone ? ' · ' + user.phone : '')"></p>
+          </div>
+          <div class="flex items-center gap-2">
+            <template x-if="user.role === 'dealer'">
+              <a :href="'/storefront.html?dealerId=' + user._id" class="px-4 py-2 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs">View Public Storefront →</a>
+            </template>
+          </div>
+        </div>
+
+        <div x-show="message" x-text="message" class="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 font-semibold"></div>
+        <div x-show="error" x-text="error" class="p-3.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 font-semibold"></div>
+
+        <!-- Account & Business Verification Form -->
+        <form @submit.prevent="saveProfile(false)" class="bg-white rounded-2xl border border-slate-200 p-6 space-y-5">
+          <h2 class="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3">Account Details</h2>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
+              <input type="text" x-model="form.name" required class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Phone Number</label>
+              <input type="text" x-model="form.phone" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
+            </div>
+          </div>
+
+          <template x-if="['seller', 'dealer', 'garage'].includes(user.role)">
+            <div class="pt-4 border-t border-slate-200 space-y-4">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="text-base font-bold text-slate-900">Seller / Dealer Verification Profile</h3>
+                  <p class="text-xs text-slate-500">Verified profiles receive a trust badge on all vehicle listings and dealer storefronts.</p>
+                </div>
+                <span class="px-3 py-1 rounded-full text-xs font-bold uppercase"
+                  :class="{
+                    'bg-emerald-100 text-emerald-800': profileStatus === 'verified',
+                    'bg-amber-100 text-amber-800': profileStatus === 'pending',
+                    'bg-red-100 text-red-800': profileStatus === 'rejected',
+                    'bg-slate-100 text-slate-700': profileStatus === 'unsubmitted'
+                  }"
+                  x-text="'Status: ' + profileStatus"></span>
+              </div>
+
+              <div x-show="verificationNotes" class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700">
+                <strong>Admin Review Note:</strong> <span x-text="verificationNotes"></span>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Business / Showroom Name</label>
+                  <input type="text" x-model="form.businessName" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Trade License / NID Number</label>
+                  <input type="text" x-model="form.licenseNo" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">TIN / BIN Number</label>
+                  <input type="text" x-model="form.tinNo" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">City</label>
+                  <input type="text" x-model="form.city" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Showroom / Pickup Address</label>
+                <input type="text" x-model="form.address" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm" />
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">About Seller / Dealership Bio</label>
+                <textarea x-model="form.bio" rows="3" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm"></textarea>
+              </div>
+            </div>
+          </template>
+
+          <div class="flex flex-wrap items-center gap-3 pt-3">
+            <button type="submit" class="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm transition">
+              Save Changes
+            </button>
+            <template x-if="['seller', 'dealer', 'garage'].includes(user.role) && profileStatus !== 'verified'">
+              <button type="button" @click="saveProfile(true)" class="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm transition">
+                Submit for Admin Verification
+              </button>
+            </template>
+          </div>
+        </form>
+      </div>
+    </template>
+  </main>
+
+  <div id="motosheba-footer"></div>
+
+  <script>
+    function profilePage() {
+      return {
+        loading: true,
+        user: null,
+        profileStatus: 'unsubmitted',
+        verificationNotes: '',
+        message: '',
+        error: '',
+        form: {
+          name: '',
+          phone: '',
+          businessName: '',
+          licenseNo: '',
+          tinNo: '',
+          city: 'Dhaka',
+          address: '',
+          bio: ''
+        },
+        async init() {
+          try {
+            const data = await window.MotoApi.get('/api/auth/me');
+            this.user = data.user;
+            if (data.user) {
+              this.form.name = data.user.name || '';
+              this.form.phone = data.user.phone || '';
+            }
+            if (data.profile) {
+              this.profileStatus = data.profile.verificationStatus || 'unsubmitted';
+              this.verificationNotes = data.profile.verificationNotes || '';
+              this.form.businessName = data.profile.businessName || '';
+              this.form.licenseNo = data.profile.licenseNo || '';
+              this.form.tinNo = data.profile.tinNo || '';
+              this.form.city = data.profile.city || 'Dhaka';
+              this.form.address = data.profile.address || '';
+              this.form.bio = data.profile.bio || '';
+            }
+          } catch (err) {
+            this.error = err.message;
+          } finally {
+            this.loading = false;
+          }
+        },
+        async saveProfile(submitForVerification) {
+          this.message = '';
+          this.error = '';
+          try {
+            const res = await window.MotoApi.patch('/api/auth/me', {
+              ...this.form,
+              submitForVerification
+            });
+            this.user = res.user;
+            if (res.profile) {
+              this.profileStatus = res.profile.verificationStatus;
+              this.verificationNotes = res.profile.verificationNotes || '';
+            }
+            this.message = submitForVerification
+              ? 'Verification request submitted to the administrator queue!'
+              : 'Profile saved successfully.';
+          } catch (err) {
+            this.error = err.message;
+          }
+        }
+      };
+    }
+  </script>
+</body>
+</html>
